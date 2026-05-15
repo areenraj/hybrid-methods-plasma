@@ -9,5 +9,5 @@ FIELD_LABELS = {
 }
 ```
 
-For dependencies, the analytical damping rate is calculated by an external library plasmadisp, available via - [text](https://github.com/ergodicio/plasmadisp.git) 
+For dependencies, the analytical damping rate is calculated by an external library plasmadisp, available via - [Link](https://github.com/ergodicio/plasmadisp.git) 
 
