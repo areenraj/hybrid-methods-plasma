@@ -4,22 +4,30 @@ import matplotlib.pyplot as plt
 # ============================================================
 # PARAMETERS
 # ============================================================
-nx = 256
-k = 0.5
+
+# Change this depending on ion or electron damping mode.  
+# For more information, see the comments in the README
+nx = 512
+k = 0.3
+L = 2 * np.pi / k
+
+testMode=False
+ionDamping=False
+
+t_end = 50.0
+CFL = 0.3
 
 # This is a bit jury-rigged but its to make sure the mesh doesn't 
-# become coarser at different wavenumbers
-scale_factor = 0.5/k
+# become coarser at different wavenumbers for electron damping
+scale_factor = 1.0 if ionDamping else 0.5/k
 
-L =  2 * np.pi / k
 nx = int(np.ceil(nx*scale_factor))
 dx = L / nx
 x = np.linspace(0.0, L, nx, endpoint=False)
 
-t_end = 50.0
-CFL = 0.1
-
-test=True
+k_rfft     = 2.0 * np.pi * np.fft.rfftfreq(nx, d=dx)
+abs_k_rfft = np.abs(k_rfft)
+abs_k_rfft[0] = 1.0
 
 # Choose fluid model:
 #   "pressureless"          : 2-moment Euler-Poisson
@@ -35,14 +43,17 @@ HP_beta1  = (32.0 - 9.0*np.pi) / (6.0*np.pi - 16.0)
 
 # Choose time integrator:
 #   "euler", "ssprk3", "rk4"
-TIME_STEPPER = "ssprk3"
+TIME_STEPPER = "rk4"
 
 # Live plotting
 plot_interval = 50
 
 # Isothermal closure: p = cs2 * rho
 cs2 = 1.0
-vt = np.sqrt(2)
+
+# Ion Electron temperature ratio
+tau = 0.5
+vt  = np.sqrt(tau) if ionDamping else 1.0  # thermal velocity in cs0 units
 
 # Energy closure: p = (gamma - 1) * (energy - 0.5 rho u^2)
 gamma = 3.0
@@ -59,10 +70,8 @@ p_floor = 1.0e-10
 # ============================================================
 def initial_condition(x, model):
     eps = 0.01
-    u0 = 0.2
     rho = 1.0 + eps * np.cos(k*x)
-#    u = np.zeros_like(x)
-    u = u0*np.ones(nx)
+    u = np.zeros_like(x)
 
     if model == "pressureless":
         m = rho * u
@@ -73,17 +82,17 @@ def initial_condition(x, model):
         return np.stack([rho, m], axis=0)
 
     if model == "energy":
-        p = np.ones_like(x)
+        p = tau * np.ones_like(x) if ionDamping else np.ones_like(x)
         energy = p / (gamma - 1.0) + 0.5 * rho * u**2
         m = rho * u
         return np.stack([rho, m, energy], axis=0)
     if model == "hammett_perkins":
-        p = np.ones_like(x)
+        p = tau * np.ones_like(x) if ionDamping else np.ones_like(x)
         energy = p / (gamma - 1.0) + 0.5 * rho * u**2
         m = rho * u
         return np.stack([rho, m, p], axis=0)
     if model == "4moment_hammett_perkins":
-        p = np.ones_like(x)
+        p = tau * np.ones_like(x) if ionDamping else np.ones_like(x)
         energy = p / (gamma - 1.0) + 0.5 * rho * u**2
         m = rho * u
         q = np.zeros_like(x)
@@ -92,48 +101,53 @@ def initial_condition(x, model):
     raise ValueError("Unknown MODEL")
 
 
-# Solve for the heat flux using Chapurin's Fourier method.
-def solve_hp_heatflux(T):
-    k_arr = 2.0 * np.pi * np.fft.fftfreq(nx, d=dx)
-    T_hat = np.fft.fft(T)
+def spectral_deriv(f_hat):
+    return np.fft.irfft(1j * k_rfft * f_hat, nx)
 
-    abs_k = np.abs(k_arr)
-    abs_k[0] = 1.0         
 
-    q_hat = -2.0 * (np.sqrt(2/np.pi)) * (1j * k_arr / abs_k) * T_hat
-    q_hat[0] = 0.0          
+def solve_hp_heatflux(T, T_hat=None):
+    
+    if testMode:
+        return np.zeros_like(T), np.zeros_like(T)
 
-    dqdz_hat = 1j * k_arr * q_hat
+    vt = np.sqrt(tau) if ionDamping else 1.0
 
-    return np.fft.ifft(q_hat).real, np.fft.ifft(dqdz_hat).real
+    if T_hat is None:
+        T_hat = np.fft.rfft(T)
 
-# Solve for r using Chapurin's Fourier method.
-def solve_r4hp_r(q, T):
+    q_hat    = -2.0 * np.sqrt(2.0 / np.pi) * vt * (1j * k_rfft / abs_k_rfft) * T_hat
+    q_hat[0] = 0.0
 
-    k_fourier = 2.0 * np.pi * np.fft.fftfreq(nx, d=dx)
+    dqdz_hat = 1j * k_rfft * q_hat
 
-    q_hat = np.fft.fft(q)
-    T_hat = np.fft.fft(T)
+    return np.fft.irfft(q_hat, nx), np.fft.irfft(dqdz_hat, nx)
 
-    abs_k = np.abs(k_fourier)
-    abs_k[0] = 1.0
+def solve_r4hp_r(q, T, T_hat=None, q_hat=None):
+    if testMode:
+        return np.zeros_like(T), np.zeros_like(T)
+
+    vt = np.sqrt(tau) if ionDamping else 1.0
+
+    if q_hat is None:
+        q_hat = np.fft.rfft(q)
+    if T_hat is None:
+        T_hat = np.fft.rfft(T)
 
     delta_r_hat = (
-        -HP_D1 * np.sqrt(2.0) * (1j * k_fourier / abs_k) * q_hat
-        + 2.0 * HP_beta1 * T_hat
+        -HP_D1 * np.sqrt(2.0) * vt    * (1j * k_rfft / abs_k_rfft) * q_hat
+        + 2.0  * HP_beta1     * vt**2 * T_hat
     )
-
     delta_r_hat[0] = 0.0
 
-    drdx_hat = 1j * k_fourier * delta_r_hat
+    drdx_hat = 1j * k_rfft * delta_r_hat
 
-    return np.fft.ifft(delta_r_hat).real, np.fft.ifft(drdx_hat).real
+    return np.fft.irfft(delta_r_hat, nx), np.fft.irfft(drdx_hat, nx)
     
 
 # ============================================================
 # FOURIER-BASED POISSON SOLVER (PERIODIC)
 # ============================================================
-def compute_electric_field(rho):
+def compute_electric_field(rho, rho_hat=None):
     """
     Periodic electrostatic solve for electron fluid with fixed ion background.
 
@@ -149,23 +163,25 @@ def compute_electric_field(rho):
     The k=0 mode is set to zero, corresponding to mean(E) = 0.
     """
 
-    if test:
+    if testMode:
         return np.zeros_like(rho)
-    
+
+    nz = k_rfft != 0.0
+
+    if ionDamping:
+        if rho_hat is None:
+            rho_hat = np.fft.rfft(rho - 1.0)
+        E_hat = np.zeros(nx // 2 + 1, dtype=complex)
+        E_hat[nz] = -1j * k_rfft[nz] * rho_hat[nz]
+        return np.fft.irfft(E_hat, nx)
+
     rho_total = rho_ion - rho
     rho_total = rho_total - np.mean(rho_total)
-
-    k = 2.0 * np.pi * np.fft.fftfreq(nx, d=dx)
-    rho_hat = np.fft.fft(rho_total)
-
-    E_hat = np.zeros_like(rho_hat, dtype=complex)
-    nonzero = np.abs(k) > 0.0
-    E_hat[nonzero] = rho_hat[nonzero] / (1j * k[nonzero])
-    E_hat[~nonzero] = 0.0
-
-    Efield = np.fft.ifft(E_hat).real
-
-    return Efield
+    if rho_hat is None:
+        rho_hat = np.fft.rfft(rho_total)
+    E_hat = np.zeros(nx // 2 + 1, dtype=complex)
+    E_hat[nz] = rho_hat[nz] / (1j * k_rfft[nz])
+    return np.fft.irfft(E_hat, nx)
 
 # ============================================================
 # MODIFY: PRIMITIVE VARIABLES
@@ -280,15 +296,32 @@ def numerical_flux(UL, UR):
         c = np.sqrt(cs2)
         alpha = np.maximum(np.abs(uL) + c, np.abs(uR) + c)
 
-    elif MODEL in ("energy", "hammett_perkins"):
+    elif MODEL == "energy":
         cL = np.sqrt(gamma * pL / rhoL)
         cR = np.sqrt(gamma * pR / rhoR)
         alpha = np.maximum(np.abs(uL) + cL, np.abs(uR) + cR)
 
+    elif MODEL == "hammett_perkins":
+        cL = np.sqrt(gamma * pL / rhoL)
+        cR = np.sqrt(gamma * pR / rhoR)
+        alpha_acoustic  = np.maximum(np.abs(uL) + cL, np.abs(uR) + cR)
+        alpha_advective = np.maximum(np.abs(uL),       np.abs(uR))
+        # rho and m rows get acoustic speed; p row gets advective speed only
+        # because F_p = p*u has eigenvalue u, not u±c
+        alpha = np.stack([alpha_acoustic, alpha_acoustic, alpha_acoustic], axis=0)
+
     elif MODEL == "4moment_hammett_perkins":
-        alpha = np.maximum(
+        cL = np.sqrt(gamma * pL / rhoL)
+        cR = np.sqrt(gamma * pR / rhoR)
+
+        alpha_advective = np.maximum(np.abs(uL),       np.abs(uR))
+        alpha_acoustic  = np.maximum(np.abs(uL) + cL,  np.abs(uR) + cR)
+        alpha_4moment   = np.maximum(
             max_wave_speed_4moment(rhoL, uL, pL, qL),
             max_wave_speed_4moment(rhoR, uR, pR, qR))
+        # F_rho=m (advective), F_m=mu+p (acoustic),
+        # F_p=pu+q (advective), F_q=uq+3pT (full 4-moment speed)
+        alpha = np.stack([alpha_acoustic, alpha_acoustic, alpha_acoustic, alpha_4moment], axis=0)
 
     else:
         raise ValueError("Unknown MODEL")
@@ -296,22 +329,39 @@ def numerical_flux(UL, UR):
     return 0.5 * (FL + FR) - 0.5 * alpha * (UR - UL)
 
 # ============================================================
+# MUSCL RECONSTRUCTION (van Leer limiter)
+# ============================================================
+def _van_leer(a, b):
+    ab = a * b
+    s = a + b
+    return np.where(ab > 0, 2.0 * ab / np.where(s != 0.0, s, 1.0), 0.0)
+
+def _muscl_states(U):
+    dU_r = np.roll(U, -1, axis=1) - U
+    dU_l = U - np.roll(U,  1, axis=1)
+    slope = _van_leer(dU_l, dU_r)
+    UL_plus  = U + 0.5 * slope
+    UR_plus  = np.roll(U - 0.5 * slope, -1, axis=1)
+    UL_minus = np.roll(U + 0.5 * slope,  1, axis=1)
+    UR_minus = U - 0.5 * slope
+    return UL_plus, UR_plus, UL_minus, UR_minus
+
+# ============================================================
 # SEMI-DISCRETE RHS
 # ============================================================
 def rhs(U):
-    rho = U[0]
-    Efield = compute_electric_field(rho)
+    rho    = U[0]
+    dn_hat = np.fft.rfft(rho - 1.0) if ionDamping else None
+    Efield = compute_electric_field(rho, rho_hat=dn_hat)
 
-    U_right = np.roll(U, -1, axis=1)
-    U_left  = np.roll(U,  1, axis=1)
-
-    F_plus  = numerical_flux(U, U_right)
-    F_minus = numerical_flux(U_left, U)
+    UL_plus, UR_plus, UL_minus, UR_minus = _muscl_states(U)
+    F_plus  = numerical_flux(UL_plus,  UR_plus)
+    F_minus = numerical_flux(UL_minus, UR_minus)
 
     dUdt = -(F_plus - F_minus) / dx
 
     # Momentum source (electrons)
-    dUdt[1] += -rho * Efield
+    dUdt[1] += +rho * Efield if ionDamping else -rho * Efield
 
     if MODEL == "energy":
         rho_safe = np.maximum(rho, rho_floor)
@@ -323,12 +373,13 @@ def rhs(U):
         u = U[1] / rho_safe
         p = U[2]
 
-        T = p/rho_safe
-        dudx  = (-np.roll(u, -2) + 8*np.roll(u, -1) - 8*np.roll(u, 1) + np.roll(u, 2)) / (12.0 * dx)
+        T     = p / rho_safe
+        T_hat = np.fft.rfft(T)
+        dudx  = spectral_deriv(np.fft.rfft(u))
 
         dUdt[2] += -2.0 * p * dudx
 
-        q, dqdz = solve_hp_heatflux(T)
+        q, dqdz = solve_hp_heatflux(T, T_hat=T_hat)
         dUdt[2] += -dqdz
 
     if MODEL == "4moment_hammett_perkins":
@@ -338,13 +389,13 @@ def rhs(U):
         p = U[2]
         q = U[3]
 
-        T = p / rho_safe
+        T     = p / rho_safe
+        T_hat = np.fft.rfft(T)
+        q_hat = np.fft.rfft(q)
+        dudx  = spectral_deriv(np.fft.rfft(u))
+        dpdx  = spectral_deriv(np.fft.rfft(p))
 
-        # I increased this to a higher order finite difference to make it more robust
-        dudx  = (-np.roll(u, -2) + 8*np.roll(u, -1) - 8*np.roll(u, 1) + np.roll(u, 2)) / (12.0 * dx)
-        dpdx  = (-np.roll(p, -2) + 8*np.roll(p, -1) - 8*np.roll(p, 1) + np.roll(p, 2)) / (12.0 * dx)
-
-        _, ddelrdx = solve_r4hp_r(q, T)
+        _, ddelrdx = solve_r4hp_r(q, T, T_hat=T_hat, q_hat=q_hat)
 
         dUdt[2] += - 2.0 * p * dudx 
 
@@ -533,15 +584,21 @@ def update_plot(U, Efield, axes, lines, history, title, t):
 # MAIN
 # ============================================================
 def main():
+    if ionDamping and MODEL not in ("hammett_perkins", "4moment_hammett_perkins"):
+        raise ValueError("Ion damping requires a kinetic closure (hammett_perkins or 4moment_hammett_perkins)")
+
     U = initial_condition(x, MODEL)
     t = 0.0
     step_count = 0
 
-    fig, axes, lines, history, title = setup_plot(U)
+    do_plot = plot_interval < 10**8
+    if do_plot:
+        fig, axes, lines, history, title = setup_plot(U)
 
     efield_time = []
     efield_amplitude = []
     rho_mode_amplitude = []
+    E_kmode_amplitude = []
 
     # Fourier bin index for the initial perturbation wavenumber.
     # Domain L = 2π/k contains exactly one full wavelength, so it sits in bin 1.
@@ -553,8 +610,6 @@ def main():
 
         if TIME_STEPPER == "rk4":
             dt *= 0.5
-
-        print(dt)
 
         if t + dt > t_end:
             dt = t_end - t
@@ -572,18 +627,23 @@ def main():
         rho_hat = np.fft.fft(U[0] - 1.0)
         rho_mode_amplitude.append(np.abs(rho_hat[_k_bin]) * 2.0 / nx)
 
-        if step_count % plot_interval == 0:
+        E_hat = np.fft.fft(Efield)
+        E_kmode_amplitude.append(E_hat[_k_bin])
+
+        if do_plot and step_count % plot_interval == 0:
             update_plot(U, Efield, axes, lines, history, title, t)
 
-    Efield = compute_electric_field(U[0])
+    if do_plot:
+        Efield = compute_electric_field(U[0])
+        update_plot(U, Efield, axes, lines, history, title, t)
+        plt.ioff()
+        plt.show()
 
-    update_plot(U, Efield, axes, lines, history, title, t)
-
-    plt.ioff()
-    plt.show()
-
+    E_kmode = np.array(E_kmode_amplitude)
+    outfile = "results/efield_data_ion.npz" if ionDamping else "results/efield_data_electron.npz"
+    extra = {"tau": tau} if ionDamping else {}
     np.savez(
-        "efield_data.npz",
+        outfile,
         t=np.array(efield_time),
         E_amp=np.array(efield_amplitude),
         rho_mode_amp=np.array(rho_mode_amplitude),
@@ -591,6 +651,9 @@ def main():
         k=k,
         nx=np.array([nx]),
         L=np.array([L]),
+        E_kmode_real=E_kmode.real,
+        E_kmode_imag=E_kmode.imag,
+        **extra,
     )
 
 if __name__ == "__main__":
