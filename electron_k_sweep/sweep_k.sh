@@ -30,7 +30,7 @@ for k_val in $K_VALUES; do
     MPLBACKEND=Agg python3 -c "
 import matplotlib; matplotlib.use('Agg')
 import numpy as np
-import Finite_Volume as sim
+import landau_damping as sim
 
 k_val = $k_val
 sim.k          = k_val
@@ -40,11 +40,6 @@ sim.t_end      = $T_END
 sim.plot_interval = 10**9
 
 sim.nx         = int(np.ceil($BASE_NX * 0.5 / k_val))
-sim.dx         = sim.L / sim.nx
-sim.x          = np.linspace(0.0, sim.L, sim.nx, endpoint=False)
-sim.k_rfft     = 2.0 * np.pi * np.fft.rfftfreq(sim.nx, d=sim.dx)
-sim.abs_k_rfft = np.abs(sim.k_rfft)
-sim.abs_k_rfft[0] = 1.0
 
 sim.main()
 "

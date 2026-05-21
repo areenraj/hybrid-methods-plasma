@@ -28,11 +28,16 @@ for tau in $TAU_VALUES; do
 
     MPLBACKEND=Agg python3 -c "
 import matplotlib
+import numpy as np
 matplotlib.use('Agg')
-import Finite_Volume as sim
+import landau_damping as sim
 sim.tau = $tau
 sim.ionDamping = True
 sim.plot_interval = 10**9
+sim.nx         = 512
+sim.L          = 100
+sim.k          = 2 * np.pi / 100
+sim.t_end      = 450.0
 sim.main()
 "
 

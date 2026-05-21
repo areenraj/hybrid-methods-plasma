@@ -7,14 +7,15 @@ import matplotlib.pyplot as plt
 
 # Change this depending on ion or electron damping mode.  
 # For more information, see the comments in the README
-nx = 512
-k = 0.3
+nx = 128
+k = 0.37
 L = 2 * np.pi / k
 
 testMode=False
 ionDamping=False
 
-t_end = 50.0
+t_end = 80.0
+t_record_start = 12.0
 CFL = 0.3
 
 # This is a bit jury-rigged but its to make sure the mesh doesn't 
@@ -110,12 +111,10 @@ def solve_hp_heatflux(T, T_hat=None):
     if testMode:
         return np.zeros_like(T), np.zeros_like(T)
 
-    vt = np.sqrt(tau) if ionDamping else 1.0
-
     if T_hat is None:
         T_hat = np.fft.rfft(T)
 
-    q_hat    = -2.0 * np.sqrt(2.0 / np.pi) * vt * (1j * k_rfft / abs_k_rfft) * T_hat
+    q_hat    = - 2.0 * np.sqrt(2.0 / np.pi) * vt * (1j * k_rfft / abs_k_rfft) * T_hat
     q_hat[0] = 0.0
 
     dqdz_hat = 1j * k_rfft * q_hat
@@ -123,10 +122,9 @@ def solve_hp_heatflux(T, T_hat=None):
     return np.fft.irfft(q_hat, nx), np.fft.irfft(dqdz_hat, nx)
 
 def solve_r4hp_r(q, T, T_hat=None, q_hat=None):
+    
     if testMode:
         return np.zeros_like(T), np.zeros_like(T)
-
-    vt = np.sqrt(tau) if ionDamping else 1.0
 
     if q_hat is None:
         q_hat = np.fft.rfft(q)
@@ -306,9 +304,8 @@ def numerical_flux(UL, UR):
         cR = np.sqrt(gamma * pR / rhoR)
         alpha_acoustic  = np.maximum(np.abs(uL) + cL, np.abs(uR) + cR)
         alpha_advective = np.maximum(np.abs(uL),       np.abs(uR))
-        # rho and m rows get acoustic speed; p row gets advective speed only
-        # because F_p = p*u has eigenvalue u, not u±c
-        alpha = np.stack([alpha_acoustic, alpha_acoustic, alpha_acoustic], axis=0)
+
+        alpha = np.maximum(alpha_acoustic, alpha_advective)
 
     elif MODEL == "4moment_hammett_perkins":
         cL = np.sqrt(gamma * pL / rhoL)
@@ -319,9 +316,8 @@ def numerical_flux(UL, UR):
         alpha_4moment   = np.maximum(
             max_wave_speed_4moment(rhoL, uL, pL, qL),
             max_wave_speed_4moment(rhoR, uR, pR, qR))
-        # F_rho=m (advective), F_m=mu+p (acoustic),
-        # F_p=pu+q (advective), F_q=uq+3pT (full 4-moment speed)
-        alpha = np.stack([alpha_acoustic, alpha_acoustic, alpha_acoustic, alpha_4moment], axis=0)
+
+        alpha = np.maximum.reduce([alpha_advective, alpha_acoustic, alpha_4moment])
 
     else:
         raise ValueError("Unknown MODEL")
@@ -344,6 +340,16 @@ def _muscl_states(U):
     UR_plus  = np.roll(U - 0.5 * slope, -1, axis=1)
     UL_minus = np.roll(U + 0.5 * slope,  1, axis=1)
     UR_minus = U - 0.5 * slope
+    return UL_plus, UR_plus, UL_minus, UR_minus
+
+def piecewise(U):
+
+    UL_plus = U
+    UR_plus = np.roll(U, -1, axis=1)
+
+    UL_minus = np.roll(U, 1, axis=1)
+    UR_minus = U
+
     return UL_plus, UR_plus, UL_minus, UR_minus
 
 # ============================================================
@@ -377,7 +383,7 @@ def rhs(U):
         T_hat = np.fft.rfft(T)
         dudx  = spectral_deriv(np.fft.rfft(u))
 
-        dUdt[2] += -2.0 * p * dudx
+        dUdt[2] += - 2.0 * p * dudx
 
         q, dqdz = solve_hp_heatflux(T, T_hat=T_hat)
         dUdt[2] += -dqdz
@@ -392,6 +398,7 @@ def rhs(U):
         T     = p / rho_safe
         T_hat = np.fft.rfft(T)
         q_hat = np.fft.rfft(q)
+
         dudx  = spectral_deriv(np.fft.rfft(u))
         dpdx  = spectral_deriv(np.fft.rfft(p))
 
@@ -621,14 +628,15 @@ def main():
 
         Efield = compute_electric_field(U[0])
 
-        efield_time.append(t)
-        efield_amplitude.append(np.max(np.abs(Efield)))
+        if t >= t_record_start:
+            efield_time.append(t)
+            efield_amplitude.append(np.max(np.abs(Efield)))
 
-        rho_hat = np.fft.fft(U[0] - 1.0)
-        rho_mode_amplitude.append(np.abs(rho_hat[_k_bin]) * 2.0 / nx)
+            rho_hat = np.fft.fft(U[0] - 1.0)
+            rho_mode_amplitude.append(np.abs(rho_hat[_k_bin]) * 2.0 / nx)
 
-        E_hat = np.fft.fft(Efield)
-        E_kmode_amplitude.append(E_hat[_k_bin])
+            E_hat = np.fft.fft(Efield)
+            E_kmode_amplitude.append(E_hat[_k_bin])
 
         if do_plot and step_count % plot_interval == 0:
             update_plot(U, Efield, axes, lines, history, title, t)

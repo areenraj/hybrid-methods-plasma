@@ -1,4 +1,4 @@
-`Finite_Volume.py` simulates both electron and ion acoustic Landau damping. Set `ionDamping = True` for ion acoustic mode; leave it `False` for electron Langmuir mode. Outputs are saved to `results/`. 
+`Finite_Volume.py` simulates both electron and ion acoustic Landau damping. Set `ionDamping = True` for ion damping. Outputs are saved to `results/`. 
 
 ## Ion damping (`ionDamping = True`)
 
