@@ -24,7 +24,8 @@ CFL            = 0.05
 plot_interval = 50
 plot_mode     = "v2"   # "v1": phase space / density / E / pressure
                #        "v2": per-beam (rho,u) / vel diff / E
-save_movie    = True
+               
+save_movie    = False #ffmpeg required!
 movie_file    = "results/two_stream.mp4"
 movie_fps     = 20
 
