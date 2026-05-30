@@ -28,7 +28,7 @@ def main():
 
     # Add parent dir so we can import landau_damping
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    parent_dir = os.path.normpath(os.path.join(script_dir, "..", ".."))
+    parent_dir = os.path.normpath(os.path.join(script_dir, "..", "..", ".."))
     sys.path.insert(0, parent_dir)
 
     # Results must land in parent_dir/results/

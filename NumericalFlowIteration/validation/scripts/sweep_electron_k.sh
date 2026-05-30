@@ -18,15 +18,17 @@ DT=0.1
 T_END=16.0
 
 # --- Hammett-Perkins parameters ---
-HP_MODEL="4moment_hammett_perkins"   # or "4moment_hammett_perkins"
+HP_MODEL="${HP_MODEL:-4moment_hammett_perkins}"
 HP_NX=256                    # fluid grid points
 HP_T_END=60.0                # fluid needs longer to show clean decay
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 BIN_DIR="$ROOT_DIR/bin"
-NUFI_RESULTS="$SCRIPT_DIR/nufi_electron_k_results.txt"
-HP_RESULTS="$SCRIPT_DIR/nufi_hp_electron_k_results.txt"
+RESULTS_DIR="$SCRIPT_DIR/../results/$HP_MODEL"
+mkdir -p "$RESULTS_DIR"
+NUFI_RESULTS="$RESULTS_DIR/nufi_electron_k_results.txt"
+HP_RESULTS="$RESULTS_DIR/hp_electron_k_results.txt"
 
 rm -f "$NUFI_RESULTS" "$HP_RESULTS"
 echo "=== Electron Landau damping sweep: NuFI GPU + Hammett-Perkins ==="
@@ -42,21 +44,22 @@ for k_val in $K_VALUES; do
 
     # --- NuFI run ---
     echo -n "  [NuFI]  patching config..."
-    python3 "$SCRIPT_DIR/gen_config_electron.py" "$k_val" "$NX" "$NU" "$DT" "$T_END"
+    python3 "$SCRIPT_DIR/generate/gen_config_electron.py" "$k_val" "$NX" "$NU" "$DT" "$T_END"
     echo -n "  compiling..."
     cd "$ROOT_DIR"
+    make -C nufi -j$(nproc) > /dev/null 2>&1
     make -C bin test_nufi_gpu_1d -j$(nproc) > /dev/null 2>&1
     echo -n "  running..."
     cd "$BIN_DIR"
     rm -f statistics.csv E_*.txt rho_*.txt f_*.txt phase_flow_*.txt s_*.txt coeffs_*.txt
     ./test_nufi_gpu_1d > /dev/null 2>&1
-    gamma_nufi=$(python3 "$SCRIPT_DIR/extract_gamma_nufi.py" "$BIN_DIR/statistics.csv")
+    gamma_nufi=$(python3 "$SCRIPT_DIR/run/extract_gamma_nufi.py" "$BIN_DIR/statistics.csv")
     echo "$k_val $gamma_nufi" >> "$NUFI_RESULTS"
     echo "  gamma=$gamma_nufi"
 
     # --- Hammett-Perkins run ---
     echo -n "  [HP]    running..."
-    gamma_hp=$(python3 "$SCRIPT_DIR/run_hp_electron.py" "$k_val" "$HP_NX" "$HP_T_END" "$HP_MODEL")
+    gamma_hp=$(python3 "$SCRIPT_DIR/run/run_hp_electron.py" "$k_val" "$HP_NX" "$HP_T_END" "$HP_MODEL")
     echo "$k_val $gamma_hp" >> "$HP_RESULTS"
     echo "  gamma=$gamma_hp"
 done
@@ -67,4 +70,4 @@ echo "  NuFI results: $NUFI_RESULTS"
 echo "  HP results:   $HP_RESULTS"
 echo "Plotting..."
 cd "$ROOT_DIR"
-python3 "$SCRIPT_DIR/compare_electron.py"
+python3 "$SCRIPT_DIR/plot/compare_electron.py" --models "$HP_MODEL"

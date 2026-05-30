@@ -158,18 +158,18 @@ class FluidSolver:
 
         return 0.5 * (FL + FR) - 0.5 * alpha * (UR - UL)
 
-    def _hp_heatflux(self, T, T_hat=None):
+    def _hp_heatflux(self, n0, T, T_hat=None):
         if self.testMode:
             return np.zeros_like(T), np.zeros_like(T)
         gr = self.grid
         if T_hat is None:
             T_hat = np.fft.rfft(T)
-        q_hat    = -2.0 * np.sqrt(2.0 / np.pi) * self.vt * (1j * gr.k_rfft / gr.abs_k_rfft) * T_hat
+        q_hat    = -2.0 * np.sqrt(2.0 / np.pi) * n0 * self.vt * (1j * gr.k_rfft / gr.abs_k_rfft) * T_hat
         q_hat[0] = 0.0
         dqdz_hat = 1j * gr.k_rfft * q_hat
         return np.fft.irfft(q_hat, gr.nx), np.fft.irfft(dqdz_hat, gr.nx)
 
-    def _r4hp_r(self, q, T, T_hat=None, q_hat=None):
+    def _r4hp_r(self, n0, q, T, T_hat=None, q_hat=None):
         if self.testMode:
             return np.zeros_like(T), np.zeros_like(T)
         gr = self.grid
@@ -178,8 +178,8 @@ class FluidSolver:
         if T_hat is None:
             T_hat = np.fft.rfft(T)
         dr_hat = (
-            -_HP_D1   * np.sqrt(2.0) * self.vt    * (1j * gr.k_rfft / gr.abs_k_rfft) * q_hat
-            + 2.0 * _HP_beta1        * self.vt**2 * T_hat
+            -_HP_D1   * np.sqrt(2.0) * n0 * self.vt    * (1j * gr.k_rfft / gr.abs_k_rfft) * q_hat
+            + 2.0 * _HP_beta1        * n0 * self.vt**2 * T_hat
         )
         dr_hat[0] = 0.0
         return np.fft.irfft(dr_hat, gr.nx), np.fft.irfft(1j * gr.k_rfft * dr_hat, gr.nx)
@@ -209,7 +209,7 @@ class FluidSolver:
             T_hat = np.fft.rfft(T)
             dudx  = gr.spectral_deriv(np.fft.rfft(u))
             dUdt[2] += -2.0 * p * dudx
-            _, dqdz = self._hp_heatflux(T, T_hat=T_hat)
+            _, dqdz = self._hp_heatflux(np.mean(rho), T, T_hat=T_hat)
             dUdt[2] -= dqdz
 
         if model == "4moment_hammett_perkins":
@@ -222,7 +222,7 @@ class FluidSolver:
             q_hat = np.fft.rfft(q)
             dudx  = gr.spectral_deriv(np.fft.rfft(u))
             dpdx  = gr.spectral_deriv(np.fft.rfft(p))
-            _, ddelrdx = self._r4hp_r(q, T, T_hat=T_hat, q_hat=q_hat)
+            _, ddelrdx = self._r4hp_r(np.mean(rho), q, T, T_hat=T_hat, q_hat=q_hat)
             dUdt[2] += -2.0 * p * dudx
             dUdt[3] += -3.0 * q * dudx + 3.0 * T * dpdx - ddelrdx
 

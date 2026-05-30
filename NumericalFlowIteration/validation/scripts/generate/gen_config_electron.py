@@ -33,7 +33,7 @@ def main():
     u_min  = -u_max
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    config_path = os.path.join(script_dir, "..", "nufi", "config.hpp")
+    config_path = os.path.join(script_dir, "..", "..", "..", "nufi", "config.hpp")
     config_path = os.path.normpath(config_path)
 
     with open(config_path, "r") as fh:

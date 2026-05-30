@@ -21,14 +21,14 @@ ionDamping = True
 
 t_end          = 450.0
 t_record_start = 0.0
-CFL            = 0.3
+CFL            = 0.2
 
 # Models: "pressureless", "isothermal", "energy",
 #         "hammett_perkins", "4moment_hammett_perkins"
 MODEL        = "4moment_hammett_perkins"
 TIME_STEPPER = "rk4"
 
-plot_interval = 50
+plot_interval = 1e7
 
 cs2   = 1.0
 tau   = 0.5

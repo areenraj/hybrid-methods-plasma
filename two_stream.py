@@ -19,9 +19,9 @@ TIME_STEPPER = "rk4"
 
 t_end          = 40.0
 t_record_start = 0.0
-CFL            = 0.05
+CFL            = 0.1
 
-plot_interval = 50
+plot_interval = 10**9  # suppress live plot — run headless
 plot_mode     = "v2"   # "v1": phase space / density / E / pressure
                #        "v2": per-beam (rho,u) / vel diff / E
                
@@ -53,7 +53,7 @@ def initial_conditions(x_arr, model, k_val, v_b_val, eps=0.01):
     if model in ("pressureless", "isothermal"):
         return np.stack([rho1, m1], axis=0), np.stack([rho2, m2], axis=0)
 
-    p = 0.01 * np.ones_like(x_arr)
+    p = 0.08 * np.ones_like(x_arr)  # vth = sqrt(p/rho) = sqrt(0.08/0.5) = 0.4 → v0/vth = 2.5
 
     if model == "energy":
         energy1 = p / (gamma - 1.0) + 0.5 * rho1 * u1**2
@@ -254,9 +254,9 @@ def update_plot_v2(U1, U2, E, solver1, solver2, grid, axes, lines, history, titl
 def main():
     grid    = Grid(nx, L)
     solver1 = FluidSolver(grid, MODEL, charge_sign=-1, gamma=gamma, cs2=cs2,
-                          CFL=CFL, rho_floor=rho_floor, p_floor=p_floor)
+                          vt=0.4, CFL=CFL, rho_floor=rho_floor, p_floor=p_floor)
     solver2 = FluidSolver(grid, MODEL, charge_sign=-1, gamma=gamma, cs2=cs2,
-                          CFL=CFL, rho_floor=rho_floor, p_floor=p_floor)
+                          vt=0.4, CFL=CFL, rho_floor=rho_floor, p_floor=p_floor)
 
     U1, U2 = initial_conditions(grid.x, MODEL, k, v_b)
 

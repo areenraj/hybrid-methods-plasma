@@ -42,7 +42,7 @@ def main():
     norm   = 1.0 / math.sqrt(2.0 * math.pi * tau)
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    config_path = os.path.join(script_dir, "..", "nufi", "config.hpp")
+    config_path = os.path.join(script_dir, "..", "..", "..", "nufi", "config.hpp")
     config_path = os.path.normpath(config_path)
 
     with open(config_path, "r") as fh:
@@ -65,6 +65,9 @@ config_t<real>::config_t() noexcept
     Lx = x_max - x_min; Lx_inv = 1/Lx;
     dx = Lx/Nx; dx_inv = 1/dx;
     du = (u_max - u_min)/Nu;
+
+    ion_acoustic = true;  // use quasineutral Boltzmann-electron Poisson
+    charge_sign  = real(1);  // ions: forward a = -dphi/dx = E_field
 }}"""
 
     src = re.sub(
