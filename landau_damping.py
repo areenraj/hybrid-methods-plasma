@@ -24,7 +24,8 @@ t_record_start = 0.0
 CFL            = 0.2
 
 # Models: "pressureless", "isothermal", "energy",
-#         "hammett_perkins", "4moment_hammett_perkins"
+#         "hammett_perkins", "4moment_hammett_perkins", "5moment_hammett_perkins",
+#         "6moment_hammett_perkins", "7moment_hammett_perkins"
 MODEL        = "4moment_hammett_perkins"
 TIME_STEPPER = "rk4"
 
@@ -65,6 +66,12 @@ def initial_condition(x_arr, model, k_val, tau_val, ion_damping, gamma_val):
     if model == "4moment_hammett_perkins":
         q = np.zeros_like(x_arr)
         return np.stack([rho, m, p, q], axis=0)
+    if model in ("5moment_hammett_perkins", "6moment_hammett_perkins", "7moment_hammett_perkins"):
+        N    = int(model[0])
+        zero = np.zeros_like(x_arr)
+        # Maxwellian central moments: q = X5 = 0, r = 3 p^2/rho, X6 = 15 p^3/rho^2
+        moments = [rho, m, p, zero, 3.0 * p**2 / rho, zero, 15.0 * p**3 / rho**2]
+        return np.stack(moments[:N], axis=0)
 
     raise ValueError(f"Unknown model: {model}")
 
@@ -162,8 +169,10 @@ def _compute_E(grid, rho, background_charge):
 # MAIN
 # ============================================================
 def main():
-    if ionDamping and MODEL not in ("hammett_perkins", "4moment_hammett_perkins"):
-        raise ValueError("Ion damping requires hammett_perkins or 4moment_hammett_perkins")
+    if ionDamping and MODEL not in ("hammett_perkins", "4moment_hammett_perkins",
+                                    "5moment_hammett_perkins", "6moment_hammett_perkins",
+                                    "7moment_hammett_perkins"):
+        raise ValueError("Ion damping requires a Hammett-Perkins model")
 
     # Derive runtime values from current module globals
     vt_val      = np.sqrt(tau) if ionDamping else 1.0

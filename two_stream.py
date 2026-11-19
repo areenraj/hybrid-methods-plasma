@@ -13,7 +13,8 @@ v_b = 1.0    # beam velocity (each beam at ±v_b)
 k   = 0.5    # perturbation wavenumber
 L   = 2 * np.pi / k
 
-# Models: "pressureless", "isothermal", "energy", "hammett_perkins", "4moment_hammett_perkins"
+# Models: "pressureless", "isothermal", "energy", "hammett_perkins", "4moment_hammett_perkins",
+#         "5moment_hammett_perkins", "6moment_hammett_perkins", "7moment_hammett_perkins"
 MODEL        = "4moment_hammett_perkins"
 TIME_STEPPER = "rk4"
 
@@ -64,6 +65,13 @@ def initial_conditions(x_arr, model, k_val, v_b_val, eps=0.01):
     if model == "4moment_hammett_perkins":
         q = np.zeros_like(x_arr)
         return np.stack([rho1, m1, p, q], axis=0), np.stack([rho2, m2, p, q], axis=0)
+    if model in ("5moment_hammett_perkins", "6moment_hammett_perkins", "7moment_hammett_perkins"):
+        N    = int(model[0])
+        zero = np.zeros_like(x_arr)
+        # Maxwellian central moments: q = X5 = 0, r = 3 p^2/rho, X6 = 15 p^3/rho^2
+        b1 = [rho1, m1, p, zero, 3.0 * p**2 / rho1, zero, 15.0 * p**3 / rho1**2]
+        b2 = [rho2, m2, p, zero, 3.0 * p**2 / rho2, zero, 15.0 * p**3 / rho2**2]
+        return np.stack(b1[:N], axis=0), np.stack(b2[:N], axis=0)
 
     raise ValueError(f"Model '{model}' not supported for two-stream")
 
