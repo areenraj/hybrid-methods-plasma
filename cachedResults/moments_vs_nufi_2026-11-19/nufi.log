@@ -1,0 +1,78 @@
+[NuFI] electron 0.23: done in 258s
+[NuFI] electron 0.252105: done in 267s
+[NuFI] electron 0.274211: done in 277s
+[NuFI] electron 0.296316: done in 237s
+[NuFI] electron 0.318421: done in 227s
+[NuFI] electron 0.340526: done in 265s
+Traceback (most recent call last):
+  File "/home/areen/Documents/Projects/hmp-dev/NumericalFlowIteration/validation/scripts/moments/run_nufi.py", line 80, in <module>
+    
+  File "/home/areen/Documents/Projects/hmp-dev/NumericalFlowIteration/validation/scripts/moments/run_nufi.py", line 72, in main
+    print(f"[NuFI] {case} {param}: cached")
+  File "/home/areen/Documents/Projects/hmp-dev/NumericalFlowIteration/validation/scripts/moments/run_nufi.py", line 28, in build_and_run
+    subprocess.run(["make", "-C", "nufi", f"-j{os.cpu_count()}"], cwd=C.NUFI_ROOT, check=True,
+  File "/usr/lib/python3.10/subprocess.py", line 505, in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+  File "/usr/lib/python3.10/subprocess.py", line 1146, in communicate
+    self.wait()
+  File "/usr/lib/python3.10/subprocess.py", line 1209, in wait
+    return self._wait(timeout=timeout)
+  File "/usr/lib/python3.10/subprocess.py", line 1959, in _wait
+    (pid, sts) = self._try_wait(0)
+  File "/usr/lib/python3.10/subprocess.py", line 1917, in _try_wait
+    (pid, sts) = os.waitpid(self.pid, wait_flags)
+KeyboardInterrupt
+[NuFI] electron 0.23: cached
+[NuFI] electron 0.252105: cached
+[NuFI] electron 0.274211: cached
+[NuFI] electron 0.296316: cached
+[NuFI] electron 0.318421: cached
+[NuFI] electron 0.340526: cached
+Traceback (most recent call last):
+  File "/home/areen/Documents/Projects/hmp-dev/NumericalFlowIteration/validation/scripts/moments/run_nufi.py", line 83, in <module>
+    main()
+  File "/home/areen/Documents/Projects/hmp-dev/NumericalFlowIteration/validation/scripts/moments/run_nufi.py", line 75, in main
+    build_and_run(gen, out)
+  File "/home/areen/Documents/Projects/hmp-dev/NumericalFlowIteration/validation/scripts/moments/run_nufi.py", line 28, in build_and_run
+    subprocess.run(["make", "-C", "nufi", f"-j{os.cpu_count()}"], cwd=C.NUFI_ROOT, check=True,
+  File "/usr/lib/python3.10/subprocess.py", line 526, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['make', '-C', 'nufi', '-j16']' returned non-zero exit status 2.
+[NuFI] electron 0.23: cached
+[NuFI] electron 0.252105: cached
+[NuFI] electron 0.274211: cached
+[NuFI] electron 0.296316: cached
+[NuFI] electron 0.318421: cached
+[NuFI] electron 0.340526: cached
+[NuFI] electron 0.362632: done in 106s
+[NuFI] electron 0.384737: done in 141s
+[NuFI] electron 0.406842: done in 134s
+[NuFI] electron 0.428947: done in 126s
+[NuFI] electron 0.451053: done in 113s
+[NuFI] electron 0.473158: done in 142s
+[NuFI] electron 0.495263: done in 136s
+[NuFI] electron 0.5: done in 141s
+[NuFI] electron 0.517368: done in 142s
+[NuFI] electron 0.539474: done in 90s
+[NuFI] electron 0.561579: done in 116s
+[NuFI] electron 0.583684: done in 47s
+[NuFI] electron 0.605789: done in 47s
+[NuFI] electron 0.627895: done in 45s
+[NuFI] electron 0.65: done in 45s
+[NuFI] ion 0.1: done in 49s
+[NuFI] ion 0.176667: done in 49s
+[NuFI] ion 0.253333: done in 49s
+[NuFI] ion 0.33: done in 49s
+[NuFI] ion 0.406667: done in 48s
+[NuFI] ion 0.483333: done in 49s
+[NuFI] ion 0.5: done in 48s
+[NuFI] ion 0.56: done in 48s
+[NuFI] ion 0.636667: done in 49s
+[NuFI] ion 0.713333: done in 49s
+[NuFI] ion 0.79: done in 49s
+[NuFI] ion 0.866667: done in 48s
+[NuFI] ion 0.943333: done in 48s
+[NuFI] ion 1.02: done in 49s
+[NuFI] ion 1.096667: done in 49s
+[NuFI] ion 1.173333: done in 49s
+[NuFI] ion 1.25: done in 49s
